@@ -39,3 +39,65 @@ Expected exclusions:
 3. Connect to `GET /events?token=<token>`.
 4. Call `POST /ready`.
 5. Render initial state from `initializeEmpty`, `loadSession`, `skillsList`, and `modelConfig`.
+
+## Action routes
+
+Use these routes from the client:
+
+- `POST /prompt`
+- `POST /interrupt`
+- `POST /select-session`
+- `POST /sessions/rename`
+- `POST /sessions/delete`
+- `GET|POST /request-skills`
+- `GET|POST /back-to-list`
+- `GET /model`
+- `POST /model`
+- `GET /processes`
+- `POST /processes/timeout`
+- `GET /undo`
+- `POST /undo/restore`
+- `POST /undo/restore-code`
+- `POST /undo/restore-conversation`
+- `GET /permissions/pending`
+- `POST /permissions/reply`
+- `POST /open-file`
+- `POST /exit`
+
+## HTTP errors
+
+Read both HTTP status and JSON payload. A failed payload uses `{ ok: false, error: string }`.
+
+Expected statuses:
+
+- `400`: invalid body or parameter
+- `401`: auth failure
+- `404`: missing route or resource
+- `409`: runtime state conflict, such as busy or no active session
+- `500`: unexpected internal error
+
+When `/prompt` returns busy, keep the current turn UI and do not enqueue a second backend request.
+
+## SSE events
+
+Handle these events as canonical state changes:
+
+- `initializeEmpty`
+- `loadSession`
+- `showSessionsList`
+- `skillsList`
+- `userMessage`
+- `loading`
+- `appendMessage`
+- `sessionStatus`
+- `permissionRequest`
+- `llmStreamProgress`
+- `mcpStatus`
+- `processStdout`
+- `modelConfig`
+- `openFile`
+- `openFileFailed`
+- `shutdown`
+- `error`
+
+Use `sequence` for ordering and `requestId` to group events from one prompt turn.
