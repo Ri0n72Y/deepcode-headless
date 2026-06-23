@@ -101,3 +101,35 @@ Handle these events as canonical state changes:
 - `error`
 
 Use `sequence` for ordering and `requestId` to group events from one prompt turn.
+
+## Prompt submission
+
+`POST /prompt` returns quickly with `202` and a request id when accepted. The assistant turn continues through SSE. The UI should not wait for the fetch call as if it were the full assistant response.
+
+The request body may include text, skills, and image URLs.
+
+If the server returns busy, keep the user draft and avoid duplicate sends.
+
+## Image attachments
+
+Preferred frontend behavior:
+
+- Convert pasted browser blobs to data URLs before sending them.
+- Send remote images only when the chosen model/provider can use them.
+- Send local project images as project-relative paths when using Tauri or a file picker.
+
+Never send browser blob URLs to the backend; they are scoped to the renderer process.
+
+## Permissions UI
+
+When `permissionRequest` arrives, show a compact permission form with the requested operation, scopes, and actions for allow once, always allow scope, deny and continue, and deny and stop.
+
+Submit decisions to `POST /permissions/reply`. Render the next state from `sessionStatus`, `permissionRequest`, and subsequent assistant/tool messages.
+
+## Model UI
+
+Use `GET /model` to populate current model, readonly provider status, available models, reasoning efforts, and thinking options.
+
+Use `POST /model` only for model, thinking mode, and reasoning effort changes. Do not write provider profile, credential, or base URL fields unless the CLI/TUI later exposes matching functionality.
+
+After a write, wait for `modelConfig` and render from that event.
