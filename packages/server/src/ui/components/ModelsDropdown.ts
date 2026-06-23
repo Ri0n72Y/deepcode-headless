@@ -1,15 +1,13 @@
-import type { ReasoningEffort } from "@vegamo/deepcode-core";
-
-type ThinkingModeOption = {
-  label: string;
-  thinkingEnabled: boolean;
-  reasoningEffort?: ReasoningEffort;
-};
-
-export const MODEL_COMMAND_MODELS = ["deepseek-v4-pro", "deepseek-v4-flash"] as const;
-
-export const MODEL_COMMAND_THINKING_OPTIONS: ThinkingModeOption[] = [
-  { label: "Thinking mode [max]", thinkingEnabled: true, reasoningEffort: "max" },
-  { label: "Thinking mode [high]", thinkingEnabled: true, reasoningEffort: "high" },
-  { label: "No thinking", thinkingEnabled: false },
-];
+/**
+ * Legacy model option compatibility shim.
+ *
+ * Summary:
+ * Keeps the current monolithic HTTP module compiling while model options are
+ * moved out of the old UI-shaped path. Remove this file when src/headless/http.ts
+ * is split and updated to import from src/model-options directly.
+ *
+ * Exports:
+ * - MODEL_COMMAND_MODELS
+ * - MODEL_COMMAND_THINKING_OPTIONS
+ */
+export { MODEL_COMMAND_MODELS, MODEL_COMMAND_THINKING_OPTIONS } from "../../model-options";
