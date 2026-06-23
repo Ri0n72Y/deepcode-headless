@@ -3,8 +3,7 @@
  *
  * Summary:
  * Starts the standalone local HTTP/SSE runtime host and wires request handling to
- * the split service modules. The legacy monolith remains in legacy-http-server.ts
- * only as a fallback reference while the final cleanup proceeds.
+ * the split service modules.
  *
  * Exports:
  * - runHeadlessHttp(options: HeadlessOptions): Promise<void>
