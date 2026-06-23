@@ -8,7 +8,7 @@
  * Exports:
  * - buildPromptContent(projectRoot: string, body: RequestBody)
  */
-import type { UserPromptContent } from "@vegamo/deepcode-core";
+import type { SkillInfo, UserPromptContent } from "@vegamo/deepcode-core";
 import { normalizeImageList } from "./images";
 import { normalizePermissionScopes, normalizeUserPermissions } from "./permissions";
 import type { RequestBody } from "./request-body";
@@ -24,7 +24,7 @@ export function buildPromptContent(projectRoot: string, body: RequestBody): { ok
     ok: true,
     data: {
       text,
-      skills: normalizeStringList(body.skills),
+      skills: normalizeSkillList(body.skills),
       imageUrls: images.data.length > 0 ? images.data : undefined,
       permissions: userPermissions.length > 0 ? userPermissions : undefined,
       alwaysAllows: normalizePermissionScopes(body.alwaysAllows),
@@ -32,8 +32,14 @@ export function buildPromptContent(projectRoot: string, body: RequestBody): { ok
   };
 }
 
-function normalizeStringList(value: unknown): string[] | undefined {
-  const list = value === undefined ? [] : Array.isArray(value) ? value : [value];
-  const strings = list.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim());
-  return strings.length > 0 ? Array.from(new Set(strings)) : undefined;
+function normalizeSkillList(value: unknown): SkillInfo[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const skills = value.filter((item): item is SkillInfo => isRecord(item) && typeof item.name === "string");
+  return skills.length > 0 ? skills : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
