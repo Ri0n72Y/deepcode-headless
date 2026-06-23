@@ -1,21 +1,26 @@
 # DeepCode Headless API
 
-This document is the frontend contract for the local HTTP server started by `deepcode --server`.
+This document is the frontend contract for the standalone DeepCode local HTTP/SSE server package.
 
-The intended frontend architecture is:
+The server is started through the `@vegamo/deepcode-server` package. New integrations should use the `deepcode-server` binary. `deepcode-headless-server` is a compatibility alias for the same entrypoint.
 
-1. Start the CLI server as a local child process.
-2. Read the printed token from stdout.
-3. Open one `EventSource` connection to `/events?token=<token>`.
-4. Send user actions through HTTP `fetch` calls.
+Do not start the interactive `deepcode` CLI with `--server`, and do not add `@vegamo/deepcode-server` back to the CLI package.
+
+## Frontend architecture
+
+1. Start `deepcode-server` as the local server process.
+2. Read the printed auth token from stdout when auth is enabled.
+3. Open one SSE connection to `/events?token=<token>`.
+4. Send user actions through HTTP requests.
 5. Treat SSE events as the source of truth for UI state.
 
-The server intentionally uses HTTP + SSE only. Do not add a WebSocket dependency unless the UI later proves that HTTP + SSE is insufficient.
+The server intentionally uses HTTP plus SSE only. Do not add a WebSocket dependency unless the UI later proves that HTTP plus SSE is insufficient.
 
 ## Scope contract
 
-The server mirrors capabilities already present in the CLI/TUI. Frontend clients must not assume backend-only
-features exist. In particular, the headless API does not provide:
+The server mirrors capabilities already present in the CLI/TUI. Frontend clients must not assume backend-only features exist.
+
+The API does not provide:
 
 - prompt queueing
 - multi-session concurrent execution
@@ -28,83 +33,80 @@ features exist. In particular, the headless API does not provide:
 
 ## Start command
 
-```bash
-deepcode --server
-deepcode --server --port 8787
-deepcode --server --host 127.0.0.1 --port 8787
-```
+Preferred commands:
 
-The duplicate `--headless` command has been removed. Use only `--server`.
+`deepcode-server`
+
+`deepcode-server --port 8787`
+
+`deepcode-server --host 127.0.0.1 --port 8787`
+
+`deepcode-server --no-auth`
+
+Compatibility alias:
+
+`deepcode-headless-server --port 8787`
+
+Forbidden old CLI command:
+
+`deepcode --server`
 
 Default behavior:
 
 - Host: `127.0.0.1`
 - Port: `8787`
 - Auth: enabled by default
-- Token transport: `?token=...`, `x-deepcode-token`, or `Authorization: Bearer ...`
+- Auth transport: query token, `x-deepcode-token`, or `Authorization: Bearer ...`
 - Non-local bind: `--host 0.0.0.0` or `--host ::` requires `--unsafe-bind`
 - No auth: `--no-auth`, for trusted local development only
 
-Example stdout:
+Example stdout with auth enabled:
 
-```text
-deepcode headless listening on http://127.0.0.1:8787 token=<token>
-```
+`deepcode server listening on http://127.0.0.1:8787 token=<token>`
 
-The printed wording still says `headless` because the internal module is named `headless`. The public command is `--server`.
+Example stdout with auth disabled:
+
+`deepcode server listening on http://127.0.0.1:8787 auth=disabled`
 
 ## Frontend boot sequence
 
-```ts
-const token = "...";
-const baseUrl = "http://127.0.0.1:8787";
-
-const events = new EventSource(`${baseUrl}/events?token=${encodeURIComponent(token)}`);
-
-events.addEventListener("appendMessage", (event) => {
-  const payload = JSON.parse(event.data);
-});
-
-await fetch(`${baseUrl}/ready`, {
-  method: "POST",
-  headers: { "x-deepcode-token": token },
-});
-```
+1. Start `deepcode-server --port 8787`.
+2. Parse the stdout auth token.
+3. Open `GET /events?token=<token>`.
+4. Call `POST /ready` with the same token in `x-deepcode-token`.
+5. Render initial state from `initializeEmpty`, `loadSession`, `skillsList`, and `modelConfig`.
 
 `/ready` sends initial UI state through SSE and also returns the same initial event list in the HTTP response. The UI should still process SSE as the canonical stream.
 
+## Auth smoke contract
+
+Default auth mode must be tested separately from `--no-auth` mode:
+
+1. Start `deepcode-server --port 8787`.
+2. Parse `token=<token>` from stdout.
+3. `GET /health` without auth must return `401`.
+4. `GET /health` with `x-deepcode-token: <token>` must return `200`.
+5. `GET /events?token=<token>` must emit `connected`.
+6. `POST /exit` with auth must close the server.
+
+`--no-auth` is allowed only as a trusted local development mode and must not be the only smoke test.
+
 ## HTTP and JSON errors
 
-All JSON routes accept request bodies up to 2 MiB. Empty bodies are treated as `{}`. Invalid JSON returns:
+All JSON routes accept request bodies up to 2 MiB. Empty bodies are treated as `{}`.
 
-```json
-{
-  "ok": false,
-  "error": "Invalid JSON body"
-}
-```
+Invalid JSON returns HTTP `400` with `{ ok: false, error: "Invalid JSON body" }`.
 
-with HTTP `400`.
+Bodies larger than the server limit return HTTP `413` with `{ ok: false, error: "Request body too large" }`.
 
-Bodies larger than the server limit return:
+Failed `{ ok: false }` route results are normalized to HTTP error status codes:
 
-```json
-{
-  "ok": false,
-  "error": "Request body too large"
-}
-```
-
-with HTTP `413`.
-
-Failed `{ "ok": false }` route results are normalized to HTTP error status codes:
-
-- `400`: invalid body, missing parameter, unsupported value, or explicit invalid selection.
-- `401`: missing or invalid token.
-- `404`: missing route or resource.
-- `409`: runtime state conflict, such as busy, no active session, pending permission request state, or no adjustable timeout.
-- `413`: JSON request body too large.
-- `500`: unexpected internal failure.
+- `400`: invalid body, missing parameter, unsupported value, or explicit invalid selection
+- `401`: missing or invalid auth
+- `404`: missing route or resource
+- `409`: runtime state conflict, such as busy, no active session, pending permission request state, or no adjustable timeout
+- `413`: JSON request body too large
+- `500`: unexpected internal failure
 
 Do not infer success from a `200` transport status alone; always check `ok`.
 
@@ -112,68 +114,44 @@ Do not infer success from a `200` transport status alone; always check `ok`.
 
 Every runtime event has this common shape:
 
-```ts
-type HeadlessEvent = {
-  type: string;
-  requestId?: string;
-  sequence: number;
-  timestamp: string;
-  [key: string]: unknown;
-};
-```
+- `type: string`
+- `requestId?: string`
+- `sequence: number`
+- `timestamp: string`
+- additional event-specific fields
 
 Use `sequence` for ordering. Use `requestId` to associate streaming updates with a submitted prompt.
 
 ## Core SSE events
 
-| Event | Meaning |
-| --- | --- |
-| `connected` | SSE stream opened. |
-| `initializeEmpty` | UI should show an empty conversation. |
-| `loadSession` | UI should load one session and replace message state. |
-| `showSessionsList` | UI should show or refresh the session list. |
-| `skillsList` | Available skills changed or were requested. |
-| `userMessage` | A prompt was accepted and should be shown in the chat. |
-| `loading` | Agent turn started or ended. |
-| `appendMessage` | SessionManager emitted a visible assistant/tool/system message. |
-| `sessionStatus` | Session state changed. Contains status, processes, askPermissions, tokenTelemetry. |
-| `permissionRequest` | The current turn is blocked waiting for user permission. |
-| `llmStreamProgress` | Token/progress estimate during streaming. |
-| `mcpStatus` | MCP server status changed. |
-| `processStdout` | A tracked process wrote stdout. |
-| `modelConfig` | Current model/thinking config changed or was requested. |
-| `openFile` | Server accepted an open-file action. |
-| `openFileFailed` | All opener commands failed. |
-| `shutdown` | Server is closing. |
-| `error` | Server-side request handling or agent execution error. |
-
-## Raw display scope
-
-The headless server does not expose backend raw display state. `/raw` may appear as an unimplemented CLI
-slash-command stub because the CLI has a `/raw` command, and it may return 405 or 501. Frontend clients must
-not depend on `GET /raw` or `POST /raw`; raw, normal, and lite display choices are owned by the frontend.
+- `connected`
+- `initializeEmpty`
+- `loadSession`
+- `showSessionsList`
+- `skillsList`
+- `userMessage`
+- `loading`
+- `appendMessage`
+- `sessionStatus`
+- `permissionRequest`
+- `llmStreamProgress`
+- `mcpStatus`
+- `processStdout`
+- `modelConfig`
+- `openFile`
+- `openFileFailed`
+- `shutdown`
+- `error`
 
 ## Basic routes
 
 ### `GET /events`
 
-Opens the SSE stream.
-
-Auth should usually be passed through the query string because browser `EventSource` cannot set custom headers:
-
-```ts
-new EventSource(`${baseUrl}/events?token=${token}`);
-```
+Opens the SSE stream. Browser `EventSource` cannot set custom headers, so auth should usually be passed through the query string.
 
 ### `GET|POST /ready`
 
-Initializes frontend state.
-
-Emits:
-
-- `initializeEmpty` or `loadSession`
-- `skillsList`
-- `modelConfig`
+Initializes frontend state. Emits `initializeEmpty` or `loadSession`, `skillsList`, and `modelConfig`.
 
 ### `GET /health`
 
@@ -181,78 +159,43 @@ Returns server health and project root.
 
 ### `GET /version`
 
-Returns CLI version.
+Returns server package version.
 
 ### `GET /commands`
 
-Returns slash command route metadata derived from the CLI command registry.
+Returns slash command route metadata derived from the shared server command map.
 
 ## Prompt route
 
 ### `POST /prompt`
 
-Request:
+Request fields:
 
-```json
-{
-  "text": "Explain this project",
-  "skills": [],
-  "imageUrls": []
-}
-```
+- `text`
+- `skills`
+- `imageUrls`
+- `images`
+- `permissions`
+- `alwaysAllows`
 
-Response:
+A successful request returns HTTP `202` with `{ ok: true, data: { accepted: true, requestId } }`. The assistant turn continues through SSE.
 
-```json
-{
-  "ok": true,
-  "data": {
-    "accepted": true,
-    "requestId": "..."
-  }
-}
-```
-
-The HTTP request returns `202` quickly. The UI receives ongoing messages and status changes from SSE.
-
-If another prompt turn is already running, the server returns:
-
-```json
-{
-  "ok": false,
-  "error": "DeepCode is busy",
-  "requestId": "..."
-}
-```
+If another prompt turn is already running, the server returns `{ ok: false, error: "DeepCode is busy", requestId }` and an HTTP conflict status.
 
 ## Image attachments
 
-The backend accepts these image forms:
+Accepted image forms:
 
-```json
-{
-  "imageUrls": ["data:image/png;base64,..."]
-}
-```
+- data URL strings
+- remote `http` or `https` image URLs
+- objects with `dataUrl`
+- objects with `url`
+- objects with `filePath`
+- objects with `path`
 
-```json
-{
-  "imageUrls": ["https://example.com/image.png"]
-}
-```
+Local file images are converted by the server to data URLs. File paths must stay inside `projectRoot`.
 
-```json
-{
-  "images": [
-    { "dataUrl": "data:image/png;base64,..." },
-    { "url": "https://example.com/image.png" },
-    { "filePath": "relative/path/in/project.png" },
-    { "path": "relative/path/in/project.jpg" }
-  ]
-}
-```
-
-Local file images are converted by the server to data URLs. File paths must stay inside `projectRoot`. Supported local extensions:
+Supported local extensions:
 
 - `.png`
 - `.jpg`
@@ -262,68 +205,19 @@ Local file images are converted by the server to data URLs. File paths must stay
 
 Max local image size: 10 MiB.
 
-Browser `blob:` URLs cannot be read by the server. A browser/Tauri frontend must convert blob attachments to data URLs before sending them:
-
-```ts
-async function blobToDataUrl(blob: Blob): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-```
+Browser `blob:` URLs cannot be read by the server. A browser or Tauri frontend must convert blob attachments to data URLs before sending them.
 
 ## Model config
 
 ### `GET /model`
 
-Returns current resolved model config:
+Returns current resolved model config, available model options, reasoning efforts, thinking options, and readonly provider information.
 
-- `availableModels` is derived from the same shared model option list used by the TUI `/model` dropdown.
-- Current supported model options are `deepseek-v4-pro` and `deepseek-v4-flash`.
-- Provider information is readonly. The response may expose `baseURL` and `apiKeyConfigured`, but never the API key value.
-
-```json
-{
-  "ok": true,
-  "data": {
-    "model": "deepseek-v4-pro",
-    "baseURL": "https://api.deepseek.com",
-    "provider": {
-      "baseURL": "https://api.deepseek.com",
-      "apiKeyConfigured": true
-    },
-    "availableModels": [
-      {
-        "model": "deepseek-v4-pro",
-        "thinkingDefault": true,
-        "supportsMultimodal": false
-      },
-      {
-        "model": "deepseek-v4-flash",
-        "thinkingDefault": true,
-        "supportsMultimodal": false
-      }
-    ],
-    "reasoningEfforts": ["high", "max"],
-    "thinkingOptions": [true, false],
-    "temperature": null,
-    "thinkingEnabled": true,
-    "reasoningEffort": "max",
-    "debugLogEnabled": false,
-    "telemetryEnabled": true,
-    "webSearchTool": null
-  }
-}
-```
+The response may expose `baseURL` and `apiKeyConfigured`, but never the API key value.
 
 ### `POST /model`
 
-Updates project or user settings using the same selection helper as the TUI model command.
-
-Only these fields are accepted for writes:
+Updates only:
 
 - `model`
 - `thinkingEnabled`
@@ -331,54 +225,99 @@ Only these fields are accepted for writes:
 
 The route does not write provider, API key, or base URL settings.
 
-Request:
-
-```json
-{
-  "model": "deepseek-v4-pro",
-  "thinkingEnabled": true,
-  "reasoningEffort": "max"
-}
-```
-
-Allowed `reasoningEffort` values:
-
-- `high`
-- `max`
-
-If `reasoningEffort` is omitted, the current setting is preserved. If it is present and not `high` or `max`,
-the server returns HTTP `400` with `reasoningEffort must be high or max`.
-
-Emits:
-
-- `modelConfig`
-
 ## Processes
 
 ### `GET /processes`
 
 Returns active session process state. With no active session, returns HTTP `409` and `No active session`.
-When a session is active but no process is running, `processes` is `null`.
 
 ### `POST /processes/timeout`
 
-Adjusts the active Bash timeout using:
+Adjusts the active Bash timeout with `deltaMs`.
 
-```json
-{ "deltaMs": 60000 }
-```
-
-If no adjustable timeout exists, returns HTTP `409` and `No adjustable active bash timeout`. Invalid `deltaMs`
-values return HTTP `400`.
-
-The headless server does not expose a single-process kill API. Use `POST /interrupt` for the active turn.
+The server does not expose a single-process kill API. Use `POST /interrupt` for the active turn.
 
 ## MCP
 
 ### `GET /mcp`
 
-Returns MCP status and may emit `mcpStatus`. The headless server does not expose MCP management routes such as
-restart, enable, disable, config editing, or logs.
+Returns MCP status and may emit `mcpStatus`. The server does not expose MCP management routes such as restart, enable, disable, config editing, or logs.
+
+## Sessions
+
+### `GET /sessions`
+
+Returns all sessions.
+
+### `POST /select-session`
+
+Selects a session and emits `loadSession` plus `skillsList`.
+
+### `POST /sessions/rename`
+
+Renames a session. `name` is accepted as an alias for `summary`.
+
+### `POST /sessions/delete`
+
+Deletes a session. If the deleted session is active, the server clears the active session and emits `initializeEmpty`.
+
+### `GET|POST /back-to-list`
+
+Compatibility route for the frontend session-list action. Emits `showSessionsList`.
+
+## Skills
+
+### `GET|POST /request-skills`
+
+Compatibility route for requesting current skills. Emits `skillsList`.
+
+### `GET /skills`
+
+Slash command route. Emits and returns `skillsList`.
+
+## Permissions
+
+### `GET /permissions/pending`
+
+Returns active pending permission request, if any.
+
+### `POST /permissions/reply`
+
+Supports allow, deny-and-continue, and deny-and-stop permission responses.
+
+## Undo
+
+### `GET /undo`
+
+Returns undo targets for the active session.
+
+### `POST /undo/restore`
+
+Restores conversation and/or code for a message.
+
+### `POST /undo/restore-code`
+
+Restores code only.
+
+### `POST /undo/restore-conversation`
+
+Restores conversation only.
+
+## Open file
+
+### `POST /open-file`
+
+Validates that the path stays inside `projectRoot`, then attempts to open the file using platform-specific editor commands.
+
+## Lifecycle
+
+### `POST /interrupt`
+
+Interrupts the active agent turn.
+
+### `POST /exit`
+
+Emits `shutdown` and closes the HTTP server.
 
 ## Negative route contract
 
@@ -394,215 +333,4 @@ These routes are intentionally not implemented and should return `404` if reques
 - `/mcp/logs`
 - `/processes/kill`
 
-## Sessions
-
-### `GET /sessions`
-
-Returns all sessions.
-
-### `POST /select-session`
-
-Request:
-
-```json
-{ "sessionId": "..." }
-```
-
-Emits:
-
-- `loadSession`
-- `skillsList`
-
-### `POST /sessions/rename`
-
-Request:
-
-```json
-{
-  "sessionId": "...",
-  "summary": "New title"
-}
-```
-
-`name` is accepted as an alias for `summary`.
-
-Emits:
-
-- `showSessionsList`
-- `sessionStatus` for the renamed session when available
-
-### `POST /sessions/delete`
-
-Request:
-
-```json
-{ "sessionId": "..." }
-```
-
-If the deleted session is active, the server clears the active session and emits `initializeEmpty`.
-
-Emits:
-
-- `initializeEmpty` when deleting the active session
-- `showSessionsList`
-
-### `GET|POST /back-to-list`
-
-Compatibility route for the VSCode plugin UI action. Emits `showSessionsList`.
-
-## Skills
-
-### `GET|POST /request-skills`
-
-Compatibility route for the VSCode plugin UI action. Emits `skillsList`.
-
-### `GET /skills`
-
-Slash command route. Emits and returns `skillsList`.
-
-## Permissions
-
-### `GET /permissions/pending`
-
-Returns active pending permission request, if any.
-
-### `POST /permissions/reply`
-
-Allow example:
-
-```json
-{
-  "permissions": [
-    { "toolCallId": "...", "permission": "allow" }
-  ],
-  "alwaysAllows": ["write-in-cwd"]
-}
-```
-
-Deny and let the model continue with another approach:
-
-```json
-{
-  "permissions": [
-    { "toolCallId": "...", "permission": "deny" }
-  ],
-  "mode": "deny-and-continue"
-}
-```
-
-Deny and stop:
-
-```json
-{
-  "permissions": [
-    { "toolCallId": "...", "permission": "deny" }
-  ],
-  "mode": "deny-and-stop"
-}
-```
-
-## Undo
-
-### `GET /undo`
-
-Returns undo targets for the active session.
-
-### `POST /undo/restore`
-
-Request:
-
-```json
-{
-  "sessionId": "...",
-  "messageId": "...",
-  "restoreConversation": true,
-  "restoreCode": true
-}
-```
-
-Defaults:
-
-- `restoreConversation`: true
-- `restoreCode`: false
-
-Emits:
-
-- `loadSession`
-- `showSessionsList`
-
-### `POST /undo/restore-code`
-
-Restores code only.
-
-Request:
-
-```json
-{
-  "sessionId": "...",
-  "messageId": "..."
-}
-```
-
-### `POST /undo/restore-conversation`
-
-Restores conversation only.
-
-Request:
-
-```json
-{
-  "sessionId": "...",
-  "messageId": "..."
-}
-```
-
-## Open file
-
-### `POST /open-file`
-
-Also supports `/openFile` for plugin compatibility.
-
-Request:
-
-```json
-{
-  "filePath": "src/foo.ts",
-  "line": 12
-}
-```
-
-The server validates that the file path stays inside the project root. It then tries:
-
-1. `code -g <file>:<line>`
-2. macOS fallback: `open <file>`
-3. Windows fallback: `cmd.exe /c start "" <file>`
-4. Linux fallback: `xdg-open <file>`
-
-The HTTP response means that the request was accepted. If every opener fails asynchronously, the SSE stream receives `openFileFailed`.
-
-## Interrupt and lifecycle
-
-### `POST /interrupt`
-
-Interrupts the active turn and explicitly emits the latest `sessionStatus`.
-
-### `POST /exit`
-
-Closes the server. The slash command route `/exit` also works.
-
-The server emits `shutdown`, ends active SSE responses, closes the HTTP server, and disposes the runtime after close.
-
-For local validation, run these smoke tests on macOS, Windows, and Linux:
-
-```bash
-npm run typecheck
-npm run build
-
-deepcode --server
-curl -N "http://127.0.0.1:8787/events?token=<token>"
-curl "http://127.0.0.1:8787/ready" -H "x-deepcode-token: <token>"
-curl "http://127.0.0.1:8787/model" -H "x-deepcode-token: <token>"
-curl "http://127.0.0.1:8787/prompt" -H "content-type: application/json" -H "x-deepcode-token: <token>" -d '{"text":"hello"}'
-curl "http://127.0.0.1:8787/open-file" -H "content-type: application/json" -H "x-deepcode-token: <token>" -d '{"filePath":"package.json","line":1}'
-curl "http://127.0.0.1:8787/exit" -X POST -H "x-deepcode-token: <token>"
-```
+The backend does not expose raw display state. `/raw` may appear as an unimplemented slash-command stub because the TUI has a `/raw` command, but frontend clients must not depend on `GET /raw` or `POST /raw`.
