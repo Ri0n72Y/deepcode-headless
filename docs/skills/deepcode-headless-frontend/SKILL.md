@@ -1,23 +1,39 @@
 ---
 name: deepcode-headless-frontend
-description: Guidance for implementing or reviewing a frontend or Tauri client for the DeepCode local HTTP server. Covers HTTP plus SSE integration, session synchronization, prompt submission, permissions UI, model config, undo restore, image attachments, open-file behavior, and lifecycle handling.
+description: Guidance for implementing or reviewing a frontend or Tauri client for the standalone DeepCode local HTTP/SSE server package. Covers HTTP plus SSE integration, session synchronization, prompt submission, permissions UI, model config, undo restore, image attachments, open-file behavior, and lifecycle handling.
 ---
 
 # DeepCode Headless Frontend Integration
 
-Use this skill when working on a frontend client for `deepcode --server`.
+Use this skill when working on a frontend client for the standalone `@vegamo/deepcode-server` package.
+
+New integrations should start the `deepcode-server` binary. Do not start the interactive `deepcode` CLI with `--server`, and do not add a server dependency back into the CLI package.
 
 The frontend should treat the local server as a stateful agent runtime. Use HTTP for actions and SSE for state updates. Do not drive the terminal UI through a pseudo terminal.
 
 ## Core architecture
 
-1. Start `deepcode --server` as a local child process.
-2. Read `token=<token>` from stdout.
+1. Start `deepcode-server` as a local child process.
+2. Read the printed auth token from stdout when auth is enabled.
 3. Open `EventSource` against `/events?token=<token>`.
 4. Call HTTP routes for user actions.
 5. Update UI state from SSE events.
 
 HTTP plus SSE is the default transport. Add WebSocket only after a concrete product need proves it is required.
+
+## Start commands
+
+Preferred command:
+
+`deepcode-server --port 8787`
+
+Compatibility alias:
+
+`deepcode-headless-server --port 8787`
+
+Do not use:
+
+`deepcode --server`
 
 ## Scope rule
 
@@ -34,11 +50,13 @@ Expected exclusions:
 
 ## Boot flow
 
-1. Start `deepcode --server --port 8787`.
-2. Parse the stdout token.
+1. Start `deepcode-server --port 8787`.
+2. Parse the stdout auth token.
 3. Connect to `GET /events?token=<token>`.
-4. Call `POST /ready`.
+4. Call `POST /ready` with the token header.
 5. Render initial state from `initializeEmpty`, `loadSession`, `skillsList`, and `modelConfig`.
+
+Also test `--no-auth` mode, but do not treat it as a substitute for the default auth smoke test.
 
 ## Action routes
 
@@ -118,64 +136,26 @@ Preferred frontend behavior:
 - Send remote images only when the chosen model/provider can use them.
 - Send local project images as project-relative paths when using Tauri or a file picker.
 
-Never send browser blob URLs to the backend; they are scoped to the renderer process.
+The server supports `.png`, `.jpg`, `.jpeg`, `.gif`, and `.webp` project-local files up to 10 MiB.
 
 ## Permissions UI
 
-When `permissionRequest` arrives, show a compact permission form with the requested operation, scopes, and actions for allow once, always allow scope, deny and continue, and deny and stop.
+When a `permissionRequest` event arrives, pause the turn UI and present allow/deny controls. Send the decision through `POST /permissions/reply`.
 
-Submit decisions to `POST /permissions/reply`. Render the next state from `sessionStatus`, `permissionRequest`, and subsequent assistant/tool messages.
+Supported modes:
 
-## Model UI
+- allow
+- deny-and-continue
+- deny-and-stop
 
-Use `GET /model` to populate current model, readonly provider status, available models, reasoning efforts, and thinking options.
+## Model config
 
-Use `POST /model` only for model, thinking mode, and reasoning effort changes. Do not write provider profile, credential, or base URL fields unless the CLI/TUI later exposes matching functionality.
+`GET /model` is safe to call during boot. `POST /model` may update only model, thinking mode, and reasoning effort. The frontend must not expose provider, API key, or base URL editing through this server API.
 
-After a write, wait for `modelConfig` and render from that event.
+## Open file
 
-## Process UI
+Use `POST /open-file` with a project-relative path and optional line number. Treat `openFileFailed` as a recoverable UI notification.
 
-Use `GET /processes` to read active session process state. Use `POST /processes/timeout` to adjust the active process timeout.
+## Lifecycle
 
-If no adjustable timeout exists, surface a non-fatal status and keep rendering from the latest `sessionStatus` event.
-
-## Undo UI
-
-Use `GET /undo` to list targets. For each target, expose restore conversation, restore code, and restore both when available.
-
-Use the three restore endpoints according to the selected action.
-
-## Raw display mode
-
-The backend does not own raw display state. The frontend owns reasoning collapse state, tool detail visibility, and raw message rendering. Do not depend on backend `/raw` state.
-
-## Open file behavior
-
-Use `POST /open-file` with `filePath` and `line`. The server validates the path and attempts to open it. The fetch response means the request was accepted; listen for `openFileFailed` to show an error.
-
-In Tauri, the frontend may also handle file opening client-side after the server validates the request.
-
-## Lifecycle rules
-
-- On `shutdown`, close EventSource and stop reconnecting.
-- On child process exit, mark the runtime offline.
-- On app close, call `POST /exit`; stop the child process only if it does not exit after a short timeout.
-- Use `POST /interrupt` before shutdown if a long task is active.
-
-## Testing checklist
-
-Final acceptance requires:
-
-- CLI typecheck and build pass.
-- `/ready` loads last session or an empty state.
-- `/prompt` sends a request and receives streamed events.
-- Busy prompt returns `409`.
-- `/permissions/reply` resumes an `ask_permission` turn.
-- `/model` reads and writes model selection.
-- `/processes` and `/processes/timeout` match TUI behavior.
-- `/undo/restore` restores conversation and code when checkpoints exist.
-- `/sessions/rename` and `/sessions/delete` refresh the session list.
-- Image attachments reach the model.
-- `/open-file` works cross-platform or reports `openFileFailed` cleanly.
-- `/exit`, SIGTERM, and app-close flows stop the server without hanging SSE connections.
+Use `POST /interrupt` to stop the active turn. Use `POST /exit` only when closing the local server process that the frontend owns.
