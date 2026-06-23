@@ -2,7 +2,8 @@
  * Server option parsing helpers.
  *
  * Summary:
- * Parses argument arrays accepted by the standalone local server package.
+ * Parses argument arrays accepted by the standalone local server package and
+ * preserves the local-only default binding policy.
  *
  * Exports:
  * - parseServerOptions(args: string[]): ParsedServerOptions
@@ -24,6 +25,9 @@ export function parseServerOptions(args: string[]): ParsedServerOptions {
   const port = Number(rawPort);
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Invalid --port value: ${rawPort}`);
+  }
+  if ((host === "0.0.0.0" || host === "::") && !args.includes("--unsafe-bind")) {
+    throw new Error("Binding outside localhost requires --unsafe-bind.");
   }
   return { host, port, authDisabled: args.includes("--no-auth") };
 }
