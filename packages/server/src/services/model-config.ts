@@ -38,9 +38,9 @@ export function buildAvailableModelOptions(): ModelOption[] {
 }
 
 export function buildReasoningEffortOptions(): ReasoningEffort[] {
-  const efforts = MODEL_COMMAND_THINKING_OPTIONS
-    .map((option) => option.reasoningEffort)
-    .filter((effort): effort is ReasoningEffort => effort === "high" || effort === "max");
+  const efforts = MODEL_COMMAND_THINKING_OPTIONS.map((option) => option.reasoningEffort).filter(
+    (effort): effort is ReasoningEffort => effort === "high" || effort === "max"
+  );
   return Array.from(new Set(efforts));
 }
 
@@ -59,7 +59,10 @@ export function normalizeModelSelection(
   if (hasReasoningEffort && !requestedReasoningEffort) {
     return { ok: false, error: "reasoningEffort must be high or max" };
   }
-  return { ok: true, data: { model, thinkingEnabled, reasoningEffort: requestedReasoningEffort ?? current.reasoningEffort } };
+  return {
+    ok: true,
+    data: { model, thinkingEnabled, reasoningEffort: requestedReasoningEffort ?? current.reasoningEffort },
+  };
 }
 
 function normalizeReasoningEffort(value: unknown): ReasoningEffort | undefined {

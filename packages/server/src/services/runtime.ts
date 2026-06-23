@@ -63,7 +63,11 @@ export class ServerRuntimeService implements ServerRuntime {
           tokenTelemetry: this.buildTokenTelemetry(entry),
         });
         if (entry.status === "ask_permission") {
-          this.pushEvent({ type: "permissionRequest", sessionId: entry.id, askPermissions: entry.askPermissions ?? [] });
+          this.pushEvent({
+            type: "permissionRequest",
+            sessionId: entry.id,
+            askPermissions: entry.askPermissions ?? [],
+          });
         }
       },
       onLlmStreamProgress: (progress) => this.pushEvent({ type: "llmStreamProgress", progress }),
@@ -94,7 +98,9 @@ export class ServerRuntimeService implements ServerRuntime {
     const events: HeadlessEvent[] = [];
     events.push(this.pushEvent(this.buildInitialSessionEvent()));
     events.push(this.pushEvent(await this.buildSkillsListEvent()));
-    events.push(this.pushEvent({ type: "modelConfig", config: this.buildModelConfig(resolveCurrentSettings(this.projectRoot)) }));
+    events.push(
+      this.pushEvent({ type: "modelConfig", config: this.buildModelConfig(resolveCurrentSettings(this.projectRoot)) })
+    );
     return { ok: true, data: { events } };
   }
 
@@ -255,7 +261,10 @@ export class ServerRuntimeService implements ServerRuntime {
       const listEvent = { type: "showSessionsList", sessions: this.buildSessionsList() };
       this.pushEvent(listEvent);
       events.push(listEvent);
-      return { ok: true, data: { sessionId, messageId, restoredCode: restoreCode, restoredConversation, events } };
+      return {
+        ok: true,
+        data: { sessionId, messageId, restoredCode: restoreCode, restoredConversation: restoreConversation, events },
+      };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -334,7 +343,8 @@ export class ServerRuntimeService implements ServerRuntime {
     const alwaysAllows = normalizePermissionScopes(body.alwaysAllows);
     const hasDeny = permissions.some((permission) => permission.permission === "deny");
     const mode = typeof body.mode === "string" ? body.mode : undefined;
-    const text = typeof body.text === "string" ? body.text : typeof body.prompt === "string" ? body.prompt : "/continue";
+    const text =
+      typeof body.text === "string" ? body.text : typeof body.prompt === "string" ? body.prompt : "/continue";
     if (hasDeny && mode === "deny-and-stop") {
       this.sessionManager.denySessionPermission(sessionId);
       this.pushActiveSessionStatus();
@@ -356,7 +366,8 @@ export class ServerRuntimeService implements ServerRuntime {
   private async runPromptTurn(requestId: string, userPrompt: UserPromptContent): Promise<void> {
     const previousRequestId = this.activeRequestId;
     this.activeRequestId = requestId;
-    const displayPrompt = userPrompt.text || (userPrompt.imageUrls && userPrompt.imageUrls.length > 0 ? "粘贴的图像" : "");
+    const displayPrompt =
+      userPrompt.text || (userPrompt.imageUrls && userPrompt.imageUrls.length > 0 ? "粘贴的图像" : "");
     this.pushEvent({ type: "userMessage", content: displayPrompt });
     this.pushEvent({ type: "loading", value: true });
     try {
@@ -414,7 +425,12 @@ export class ServerRuntimeService implements ServerRuntime {
   }
 
   private buildInitializeEmptyEvent(): HeadlessEvent {
-    return { type: "initializeEmpty", sessions: this.buildSessionsList(), status: null, tokenTelemetry: this.buildTokenTelemetry(null) };
+    return {
+      type: "initializeEmpty",
+      sessions: this.buildSessionsList(),
+      status: null,
+      tokenTelemetry: this.buildTokenTelemetry(null),
+    };
   }
 
   private buildLoadSessionEvent(session: SessionEntry): HeadlessEvent {
@@ -432,11 +448,15 @@ export class ServerRuntimeService implements ServerRuntime {
   }
 
   private async buildSkillsListEvent(sessionId?: string): Promise<HeadlessEvent> {
-    const skills = await this.sessionManager.listSkills(sessionId ?? this.sessionManager.getActiveSessionId() ?? undefined);
+    const skills = await this.sessionManager.listSkills(
+      sessionId ?? this.sessionManager.getActiveSessionId() ?? undefined
+    );
     return { type: "skillsList", skills };
   }
 
-  private buildSessionsList(): Array<Pick<SessionEntry, "id" | "createTime" | "updateTime" | "status"> & { summary: string }> {
+  private buildSessionsList(): Array<
+    Pick<SessionEntry, "id" | "createTime" | "updateTime" | "status"> & { summary: string }
+  > {
     return this.sessionManager.listSessions().map((session) => ({
       id: session.id,
       summary: session.summary || "Untitled",
@@ -476,7 +496,10 @@ export class ServerRuntimeService implements ServerRuntime {
   }
 }
 
-function normalizeOpenFileRequest(projectRoot: string, body: RequestBody): { ok: true; data: OpenFileRequest } | { ok: false; error: string } {
+function normalizeOpenFileRequest(
+  projectRoot: string,
+  body: RequestBody
+): { ok: true; data: OpenFileRequest } | { ok: false; error: string } {
   const rawPath = typeof body.filePath === "string" ? body.filePath : typeof body.path === "string" ? body.path : "";
   const request = normalizeProjectFilePath(projectRoot, rawPath);
   if (!request.ok) {
@@ -515,7 +538,9 @@ function launchOpenFile(request: OpenFileRequest, onFinalError: (error: unknown)
 
 function normalizeDeltaMs(value: unknown): { ok: true; data: number } | { ok: false; error: string } {
   const deltaMs = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  return Number.isFinite(deltaMs) && deltaMs !== 0 ? { ok: true, data: deltaMs } : { ok: false, error: "deltaMs must be a non-zero finite number" };
+  return Number.isFinite(deltaMs) && deltaMs !== 0
+    ? { ok: true, data: deltaMs }
+    : { ok: false, error: "deltaMs must be a non-zero finite number" };
 }
 
 function normalizeSessionId(value: unknown, fallback: string | null): string | null {

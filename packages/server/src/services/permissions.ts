@@ -47,7 +47,9 @@ export function normalizePermissionScopes(value: unknown): PermissionScope[] | u
   if (!Array.isArray(value)) {
     return undefined;
   }
-  const scopes = value.filter((item): item is PermissionScope => typeof item === "string" && VALID_PERMISSION_SCOPES.has(item as PermissionScope));
+  const scopes = value.filter(
+    (item): item is PermissionScope => typeof item === "string" && VALID_PERMISSION_SCOPES.has(item as PermissionScope)
+  );
   return scopes.length > 0 ? Array.from(new Set(scopes)) : undefined;
 }
 

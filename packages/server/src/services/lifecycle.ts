@@ -7,9 +7,12 @@
  * Exports:
  * - shutdownServer(httpServer: ReturnType<typeof createServer>, activeResponses: Set<ServerResponse>): void
  */
-import { createServer, type ServerResponse } from "node:http";
+import type { createServer, ServerResponse } from "node:http";
 
-export function shutdownServer(httpServer: ReturnType<typeof createServer>, activeResponses: Set<ServerResponse>): void {
+export function shutdownServer(
+  httpServer: ReturnType<typeof createServer>,
+  activeResponses: Set<ServerResponse>
+): void {
   for (const response of activeResponses) {
     if (!response.writableEnded) {
       try {

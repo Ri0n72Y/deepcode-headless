@@ -3,8 +3,8 @@
  *
  * Summary:
  * Defines the runtime surface consumed by route and SSE services. The concrete
- * runtime class is still inside legacy-http-server.ts and will be moved into its
- * own service after route dispatch and SSE streaming are wired to this contract.
+ * runtime implementation lives in runtime.ts and the HTTP wiring consumes this
+ * contract through the split service modules.
  *
  * Exports:
  * - type ServerRuntime

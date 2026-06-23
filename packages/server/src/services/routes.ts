@@ -85,7 +85,11 @@ export async function routeRequest(input: RouteRequestInput): Promise<void> {
   }
   if (method === "POST" && pathname === "/prompt") {
     const prompt = buildPromptContent(projectRoot, await readJsonBody(request));
-    return sendJson(response, prompt.ok ? 202 : 400, prompt.ok ? runtime.startPrompt(prompt.data) : { ok: false, error: prompt.error });
+    return sendJson(
+      response,
+      prompt.ok ? 202 : 400,
+      prompt.ok ? runtime.startPrompt(prompt.data) : { ok: false, error: prompt.error }
+    );
   }
   if (method === "POST" && pathname === "/interrupt") {
     return sendJson(response, 200, runtime.interrupt());
@@ -94,10 +98,18 @@ export async function routeRequest(input: RouteRequestInput): Promise<void> {
     return sendJson(response, 200, runtime.restoreUndo(await readJsonBody(request)));
   }
   if (method === "POST" && pathname === "/undo/restore-code") {
-    return sendJson(response, 200, runtime.restoreUndo(await readJsonBody(request), { restoreCode: true, restoreConversation: false }));
+    return sendJson(
+      response,
+      200,
+      runtime.restoreUndo(await readJsonBody(request), { restoreCode: true, restoreConversation: false })
+    );
   }
   if (method === "POST" && pathname === "/undo/restore-conversation") {
-    return sendJson(response, 200, runtime.restoreUndo(await readJsonBody(request), { restoreCode: false, restoreConversation: true }));
+    return sendJson(
+      response,
+      200,
+      runtime.restoreUndo(await readJsonBody(request), { restoreCode: false, restoreConversation: true })
+    );
   }
   if (method === "POST" && pathname === "/exit") {
     sendJson(response, 200, { ok: true });
@@ -113,7 +125,10 @@ export async function routeRequest(input: RouteRequestInput): Promise<void> {
     return sendJson(response, 405, { ok: false, error: `Use ${command.method} ${command.path}` });
   }
   if (!command.implemented) {
-    return sendJson(response, 501, { ok: false, error: `Command ${command.label} is not implemented in server mode yet.` });
+    return sendJson(response, 501, {
+      ok: false,
+      error: `Command ${command.label} is not implemented in server mode yet.`,
+    });
   }
   if (command.name === "skills") {
     return sendJson(response, 200, await runtime.sendSkillsList());
@@ -138,5 +153,9 @@ export async function routeRequest(input: RouteRequestInput): Promise<void> {
 
   const body = method === "POST" ? await readJsonBody(request) : {};
   const prompt = buildPromptContent(projectRoot, { ...body, text: `/${command.name}` });
-  return sendJson(response, prompt.ok ? 202 : 400, prompt.ok ? runtime.startPrompt(prompt.data) : { ok: false, error: prompt.error });
+  return sendJson(
+    response,
+    prompt.ok ? 202 : 400,
+    prompt.ok ? runtime.startPrompt(prompt.data) : { ok: false, error: prompt.error }
+  );
 }

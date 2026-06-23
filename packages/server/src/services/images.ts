@@ -16,7 +16,10 @@ import { normalizeProjectFilePath } from "./open-file";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-export function normalizeImageList(projectRoot: string, value: unknown): { ok: true; data: string[] } | { ok: false; error: string } {
+export function normalizeImageList(
+  projectRoot: string,
+  value: unknown
+): { ok: true; data: string[] } | { ok: false; error: string } {
   const items = Array.isArray(value) ? value : value === undefined ? [] : [value];
   const imageUrls: string[] = [];
   for (const item of items) {
@@ -31,7 +34,10 @@ export function normalizeImageList(projectRoot: string, value: unknown): { ok: t
   return { ok: true, data: imageUrls };
 }
 
-function normalizeImageItem(projectRoot: string, item: unknown): { ok: true; data: string | null } | { ok: false; error: string } {
+function normalizeImageItem(
+  projectRoot: string,
+  item: unknown
+): { ok: true; data: string | null } | { ok: false; error: string } {
   if (typeof item === "string") {
     return normalizeImageString(projectRoot, item);
   }
@@ -53,7 +59,10 @@ function normalizeImageItem(projectRoot: string, item: unknown): { ok: true; dat
   return { ok: false, error: "Image object requires dataUrl, url, filePath, or path" };
 }
 
-function normalizeImageString(projectRoot: string, value: string): { ok: true; data: string | null } | { ok: false; error: string } {
+function normalizeImageString(
+  projectRoot: string,
+  value: string
+): { ok: true; data: string | null } | { ok: false; error: string } {
   const trimmed = value.trim();
   if (!trimmed) {
     return { ok: true, data: null };
@@ -77,7 +86,10 @@ function normalizeImageString(projectRoot: string, value: string): { ok: true; d
   return readImageFileAsDataUrl(projectRoot, trimmed);
 }
 
-function readImageFileAsDataUrl(projectRoot: string, filePath: string): { ok: true; data: string } | { ok: false; error: string } {
+function readImageFileAsDataUrl(
+  projectRoot: string,
+  filePath: string
+): { ok: true; data: string } | { ok: false; error: string } {
   const request = normalizeProjectFilePath(projectRoot, filePath);
   if (!request.ok) {
     return request;
