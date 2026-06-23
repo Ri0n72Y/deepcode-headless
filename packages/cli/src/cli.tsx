@@ -21,8 +21,6 @@ if (args.includes("--help") || args.includes("-h")) {
       "  deepcode                              Launch the interactive TUI in the current directory",
       "  deepcode -p <prompt>                  Launch with a pre-filled prompt",
       "  deepcode --prompt <prompt>            Same as -p",
-      "  deepcode --server                     Start the local HTTP server interface",
-      "  deepcode --server --port 8787         Start the local HTTP server interface on a custom port",
       "  deepcode --version                    Print the version",
       "  deepcode --help                       Show this help",
       "",
@@ -72,31 +70,12 @@ let initialPrompt = extractInitialPrompt(args);
 const projectRoot = process.cwd();
 configureWindowsShell();
 
-if (args.includes("--server")) {
-  void runServer();
-} else {
-  if (!process.stdin.isTTY) {
-    process.stderr.write("deepcode requires an interactive terminal (TTY). " + "Re-run from a real terminal session.\n");
-    process.exit(1);
-  }
-
-  void main();
+if (!process.stdin.isTTY) {
+  process.stderr.write("deepcode requires an interactive terminal (TTY). " + "Re-run from a real terminal session.\n");
+  process.exit(1);
 }
 
-async function runServer(): Promise<void> {
-  try {
-    const { runHeadlessHttp } = await import("@vegamo/deepcode-server");
-    await runHeadlessHttp({
-      args,
-      projectRoot,
-      version: packageInfo.version || "unknown",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`deepcode server failed: ${message}\n`);
-    process.exit(1);
-  }
-}
+void main();
 
 async function main(): Promise<void> {
   const updatePromptResult = await promptForPendingUpdate(packageInfo);
