@@ -3,16 +3,18 @@
  *
  * Summary:
  * Defines the runtime surface consumed by route and SSE services. The concrete
- * runtime class is still inside http-server.ts and will be moved into its own
- * service after route dispatch is wired to this interface.
+ * runtime class is still inside legacy-http-server.ts and will be moved into its
+ * own service after route dispatch and SSE streaming are wired to this contract.
  *
  * Exports:
  * - type ServerRuntime
  */
+import type { HeadlessEvent } from "./events";
 import type { RequestBody } from "./request-body";
 import type { JsonValue } from "./types";
 
 export type ServerRuntime = {
+  subscribe(listener: (event: HeadlessEvent) => void): () => void;
   ready(): Promise<JsonValue>;
   getModelConfig(): JsonValue;
   updateModelConfig(body: RequestBody): JsonValue;
