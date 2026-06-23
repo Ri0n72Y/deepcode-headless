@@ -40,6 +40,9 @@ jobs:
       - name: Build Core
         run: npm run build --workspace=@vegamo/deepcode-core
 
+      - name: Build Server
+        run: npm run build --workspace=@vegamo/deepcode-server
+
       - name: Bundle CLI
         run: npm run bundle
 

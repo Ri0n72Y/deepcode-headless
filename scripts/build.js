@@ -14,11 +14,12 @@ function run(command, args, label) {
 }
 
 console.log("=========================================");
-console.log("  Deep Code CLI — Build");
+console.log("  Deep Code — Build");
 console.log("=========================================");
 
-run("npm", ["run", "build", "--workspace=@vegamo/deepcode-core"], "1/3");
-run("node", ["scripts/rewrite-esm-imports.js"], "2/3");
-run("npm", ["run", "bundle"], "3/3");
+run("npm", ["run", "build", "--workspace=@vegamo/deepcode-core"], "1/4 Build core");
+run("npm", ["run", "build", "--workspace=@vegamo/deepcode-server"], "2/4 Build server");
+run("node", ["scripts/rewrite-esm-imports.js"], "3/4 Rewrite ESM imports");
+run("npm", ["run", "bundle"], "4/4 Bundle CLI");
 
 console.log("\n✅  Build complete.\n\n");

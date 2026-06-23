@@ -21,8 +21,8 @@ if (args.includes("--help") || args.includes("-h")) {
       "  deepcode                              Launch the interactive TUI in the current directory",
       "  deepcode -p <prompt>                  Launch with a pre-filled prompt",
       "  deepcode --prompt <prompt>            Same as -p",
-      "  deepcode --server                     Start the local HTTP interface",
-      "  deepcode --server --port 8787         Start the local HTTP interface on a custom port",
+      "  deepcode --server                     Start the local HTTP server interface",
+      "  deepcode --server --port 8787         Start the local HTTP server interface on a custom port",
       "  deepcode --version                    Print the version",
       "  deepcode --help                       Show this help",
       "",
@@ -85,7 +85,7 @@ if (args.includes("--server")) {
 
 async function runServer(): Promise<void> {
   try {
-    const { runHeadlessHttp } = await import("./headless/http");
+    const { runHeadlessHttp } = await import("@vegamo/deepcode-server");
     await runHeadlessHttp({
       args,
       projectRoot,
