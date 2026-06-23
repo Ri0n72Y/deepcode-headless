@@ -3,22 +3,17 @@
  *
  * Summary:
  * Opens and writes SSE streams for frontend event subscriptions. Runtime event
- * production remains behind a small subscribe interface.
+ * production is represented by the shared ServerRuntime contract.
  *
  * Exports:
- * - openSseStream(request: IncomingMessage, response: ServerResponse, runtime: SseRuntime): void
+ * - openSseStream(request: IncomingMessage, response: ServerResponse, runtime: ServerRuntime): void
  * - writeSseEvent(response: ServerResponse, eventName: string, data: JsonValue): void
- * - type SseRuntime
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { HeadlessEvent } from "./events";
+import type { ServerRuntime } from "./runtime-contract";
 import type { JsonValue } from "./types";
 
-export type SseRuntime = {
-  subscribe(listener: (event: HeadlessEvent) => void): () => void;
-};
-
-export function openSseStream(request: IncomingMessage, response: ServerResponse, runtime: SseRuntime): void {
+export function openSseStream(request: IncomingMessage, response: ServerResponse, runtime: ServerRuntime): void {
   response.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache, no-transform",
