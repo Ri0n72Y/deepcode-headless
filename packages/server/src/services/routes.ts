@@ -3,47 +3,23 @@
  *
  * Summary:
  * Maps local server HTTP paths to runtime actions. This service owns request path
- * dispatch only; runtime behavior stays behind the RouteRuntime interface.
+ * dispatch only; runtime behavior stays behind the shared ServerRuntime contract.
  *
  * Exports:
  * - routeRequest(input: RouteRequestInput): Promise<void>
- * - type RouteRuntime
  * - type RouteRequestInput
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildHeadlessCommandRoutes, findHeadlessCommandRoute } from "../command-map";
 import { buildPromptContent } from "./prompt-content";
-import { readJsonBody, type RequestBody } from "./request-body";
+import { readJsonBody } from "./request-body";
+import type { ServerRuntime } from "./runtime-contract";
 import { sendJson } from "./response";
-import type { JsonValue } from "./types";
-
-export type RouteRuntime = {
-  ready(): Promise<JsonValue>;
-  getModelConfig(): JsonValue;
-  updateModelConfig(body: RequestBody): JsonValue;
-  listProcesses(): JsonValue;
-  adjustProcessTimeout(body: RequestBody): JsonValue;
-  listSessions(): JsonValue;
-  renameSession(body: RequestBody): JsonValue;
-  deleteSession(body: RequestBody): JsonValue;
-  sendSkillsList(): Promise<JsonValue>;
-  showSessionsList(): JsonValue;
-  openFile(body: RequestBody): JsonValue;
-  pendingPermissions(): JsonValue;
-  replyPermissions(body: RequestBody): JsonValue;
-  selectSession(sessionId: string): Promise<JsonValue>;
-  startPrompt(prompt: unknown): JsonValue;
-  interrupt(): JsonValue;
-  restoreUndo(body: RequestBody, defaults?: { restoreCode?: boolean; restoreConversation?: boolean }): JsonValue;
-  newSession(): Promise<JsonValue>;
-  undoTargets(): JsonValue;
-  getMcpStatus(): unknown[];
-};
 
 export type RouteRequestInput = {
   request: IncomingMessage;
   response: ServerResponse;
-  runtime: RouteRuntime;
+  runtime: ServerRuntime;
   version: string;
   projectRoot: string;
   shutdown: () => void;
