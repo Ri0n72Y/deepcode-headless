@@ -133,3 +133,49 @@ Use `GET /model` to populate current model, readonly provider status, available 
 Use `POST /model` only for model, thinking mode, and reasoning effort changes. Do not write provider profile, credential, or base URL fields unless the CLI/TUI later exposes matching functionality.
 
 After a write, wait for `modelConfig` and render from that event.
+
+## Process UI
+
+Use `GET /processes` to read active session process state. Use `POST /processes/timeout` to adjust the active process timeout.
+
+If no adjustable timeout exists, surface a non-fatal status and keep rendering from the latest `sessionStatus` event.
+
+## Undo UI
+
+Use `GET /undo` to list targets. For each target, expose restore conversation, restore code, and restore both when available.
+
+Use the three restore endpoints according to the selected action.
+
+## Raw display mode
+
+The backend does not own raw display state. The frontend owns reasoning collapse state, tool detail visibility, and raw message rendering. Do not depend on backend `/raw` state.
+
+## Open file behavior
+
+Use `POST /open-file` with `filePath` and `line`. The server validates the path and attempts to open it. The fetch response means the request was accepted; listen for `openFileFailed` to show an error.
+
+In Tauri, the frontend may also handle file opening client-side after the server validates the request.
+
+## Lifecycle rules
+
+- On `shutdown`, close EventSource and stop reconnecting.
+- On child process exit, mark the runtime offline.
+- On app close, call `POST /exit`; stop the child process only if it does not exit after a short timeout.
+- Use `POST /interrupt` before shutdown if a long task is active.
+
+## Testing checklist
+
+Final acceptance requires:
+
+- CLI typecheck and build pass.
+- `/ready` loads last session or an empty state.
+- `/prompt` sends a request and receives streamed events.
+- Busy prompt returns `409`.
+- `/permissions/reply` resumes an `ask_permission` turn.
+- `/model` reads and writes model selection.
+- `/processes` and `/processes/timeout` match TUI behavior.
+- `/undo/restore` restores conversation and code when checkpoints exist.
+- `/sessions/rename` and `/sessions/delete` refresh the session list.
+- Image attachments reach the model.
+- `/open-file` works cross-platform or reports `openFileFailed` cleanly.
+- `/exit`, SIGTERM, and app-close flows stop the server without hanging SSE connections.
