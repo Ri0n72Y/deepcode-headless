@@ -1,6 +1,6 @@
 {
   "name": "@vegamo/deepcode",
-  "description": "Deep Code — CLI, core library, local server, and VSCode companion",
+  "description": "Deep Code — CLI, core library, and VSCode companion",
   "license": "MIT",
   "packageManager": "npm@10.9.4",
   "type": "module",
@@ -22,7 +22,6 @@
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "clean": "node scripts/clean.js",
     "build": "node scripts/build.js",
-    "build:server": "npm run build --workspace=@vegamo/deepcode-server",
     "build:vscode": "node scripts/build-vscode-companion.js",
     "start": "node scripts/start.js",
     "build-and-start": "npm run build && npm run start",
