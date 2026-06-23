@@ -1,2 +1,2 @@
-export { runHeadlessHttp } from "./headless/http";
-export type { HeadlessOptions } from "./headless/http";
+export { runHeadlessHttp } from "./services/http-server";
+export type { HeadlessOptions } from "./services/http-server";
