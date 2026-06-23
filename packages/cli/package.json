@@ -32,7 +32,6 @@
   },
   "dependencies": {
     "@vegamo/deepcode-core": "file:../core",
-    "@vegamo/deepcode-server": "file:../server",
     "chalk": "^5.6.2",
     "gradient-string": "^3.0.0",
     "ignore": "^7.0.5",
